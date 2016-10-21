@@ -2,7 +2,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <functional>
+#include <vector>
 #include <iostream>
+#include <cstring>
 #include <stdexcept>
 #include "vk_deleter.h"
 
@@ -46,13 +48,46 @@ private:
 		unsigned int glfwExtensionCount = 0;
 		const char** glfwExtensions =
 			glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		for (unsigned int index = 0; index < glfwExtensionCount; ++index) {
+			std::cout << "GLFW Needed Exception: " << glfwExtensions[index] << std::endl;
+		}
 		createInfo.enabledExtensionCount = glfwExtensionCount;
 		createInfo.ppEnabledExtensionNames = glfwExtensions;
 		createInfo.enabledLayerCount = 0;
 
+		// exit if unable to create vk instance
 		if (vkCreateInstance(&createInfo, nullptr, instance.replace()) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create vk instance");
 		}
+
+		uint32_t extensionCount = 0;
+		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+		std::vector<VkExtensionProperties> extensions(extensionCount);
+		vkEnumerateInstanceExtensionProperties(nullptr,
+			&extensionCount, extensions.data());
+		if (!validateGLFWRequiredExtensions(glfwExtensionCount, glfwExtensions, extensions)) {
+			throw std::runtime_error("some extensions required by GLFW are missing");
+		}
+		std::cout << "Extension Count: " << extensionCount << std::endl;
+		for (const auto& extension : extensions) {
+			std::cout << "\t" << extension.extensionName << std::endl;
+		}
+	}
+
+	bool validateGLFWRequiredExtensions(uint32_t count,
+		const char** glfwExtensions,
+		std::vector<VkExtensionProperties> extensions)
+	{
+		unsigned short found = 0;
+		for (unsigned int index = 0; index < count; ++index) {
+			for (const auto& ext : extensions) {
+				if (!strcmp(glfwExtensions[index], ext.extensionName)) {
+					std::cout << "Found " << ext.extensionName << std::endl;
+					found += 1;
+				}
+			}
+		}
+		return count >= found;
 	}
 
 	void initVulkan()
